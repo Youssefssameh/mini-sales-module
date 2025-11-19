@@ -1,1 +1,282 @@
-Hell
+## Architecture Diagram
+
+### High-Level System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Mini Odoo Sales System                    │
+└─────────────────────────────────────────────────────────────┘
+
+┌──────────────┐         ┌──────────────┐         ┌──────────────┐
+│   Customer   │────────▶│ Sale Order   │────────▶│   Invoice    │
+│  (Partner)   │ 1:N     │              │   1:1    │              │
+└──────────────┘         └──────────────┘         └──────────────┘
+      │                         │                         │
+      │                         │                         │
+      │                         ▼                         ▼
+      │                  ┌──────────────┐         ┌──────────────┐
+      │                  │ Sale Order   │         │ Invoice Line │
+      │                  │    Line      │         │              │
+      │                  └──────────────┘         └──────────────┘
+      │                         │                         │
+      │                         │                         │
+      └─────────────────────────┼─────────────────────────┘
+                                │
+                                ▼
+                        ┌──────────────┐
+                        │   Product    │
+                        │              │
+                        └──────────────┘
+```
+
+### Class Inheritance Hierarchy
+
+```
+                    ┌──────────────┐
+                    │  BaseModel   │  (Abstract Base Class)
+                    │              │
+                    │ - id         │
+                    │ - name       │
+                    └──────┬───────┘
+                           │
+            ┌──────────────┼──────────────┐
+            │              │              │
+    ┌───────▼──────┐ ┌────▼─────┐ ┌─────▼──────┐
+    │   Customer   │ │ Product  │ │SaleOrder   │
+    │              │ │          │ │            │
+    │ - email      │ │ - price  │ │ - customer │
+    │ - orders[]   │ │          │ │ - lines[]  │
+    │ - invoices[] │ │          │ │ - state    │
+    └──────────────┘ └──────────┘ │ - invoice  │
+                                   └────────────┘
+                                            │
+                                   ┌────────▼──────┐
+                                   │   Invoice     │
+                                   │               │
+                                   │ - customer    │
+                                   │ - lines[]     │
+                                   │ - state       │
+                                   └───────────────┘
+```
+
+---
+
+## Class Relationships
+
+### Relationship Types
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    Relationship Diagram                        │
+└──────────────────────────────────────────────────────────────┘
+
+Customer (1) ──────< (N) SaleOrder
+   │                      │
+   │                      │ (1:1)
+   │                      ▼
+   │                  Invoice
+   │                      │
+   │                      │ (1:N)
+   │                      ▼
+   │                  InvoiceLine
+   │                      │
+   │                      │ (N:1)
+   │                      ▼
+   └──────────────────> Product <─── SaleOrderLine
+                              │
+                              │ (N:1)
+                              ▼
+                         SaleOrderLine
+```
+
+### Detailed Entity Relationships
+
+```
+┌─────────────┐
+│  Customer   │
+├─────────────┤
+│ id          │
+│ name        │
+│ email       │
+│             │
+│ sale_orders │─────┐
+│ invoices    │     │
+└─────────────┘     │
+                    │
+                    │ (1:N)
+                    │
+        ┌───────────▼──────────┐
+        │    SaleOrder         │
+        ├──────────────────────┤
+        │ id                   │
+        │ name                 │
+        │ customer (FK)        │◄───┐
+        │ state                │    │
+        │                      │    │
+        │ lines[] (1:N)        │    │
+        │ invoice (1:1)        │    │
+        └──────────┬───────────┘    │
+                   │                │
+                   │ (1:N)          │
+                   │                │
+        ┌──────────▼───────────┐    │
+        │   SaleOrderLine      │    │
+        ├──────────────────────┤    │
+        │ product (FK)         │    │
+        │ quantity             │    │
+        │ unit_price           │    │
+        │ subtotal             │    │
+        └──────────┬───────────┘    │
+                   │                │
+                   │ (N:1)          │
+                   │                │
+        ┌──────────▼───────────┐    │
+        │      Product         │    │
+        ├──────────────────────┤    │
+        │ id                   │    │
+        │ name                 │    │
+        │ price                │    │
+        └──────────────────────┘    │
+                                    │
+                    ┌───────────────┘
+                    │
+        ┌───────────▼───────────┐
+        │      Invoice          │
+        ├───────────────────────┤
+        │ id                    │
+        │ name                  │
+        │ customer (FK)         │
+        │ state                 │
+        │                       │
+        │ lines[] (1:N)         │
+        └───────────┬───────────┘
+                    │
+                    │ (1:N)
+                    │
+        ┌───────────▼───────────┐
+        │    InvoiceLine        │
+        ├───────────────────────┤
+        │ product (FK)          │
+        │ quantity              │
+        │ unit_price            │
+        │ subtotal              │
+        └───────────────────────┘
+```
+
+---
+
+## Data Flow
+
+### Sale Order to Invoice Workflow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              Sale Order Confirmation Workflow                │
+└─────────────────────────────────────────────────────────────┘
+
+1. CREATE SALE ORDER
+   ┌──────────────┐
+   │   Customer   │
+   └──────┬───────┘
+          │
+          ▼
+   ┌──────────────┐
+   │ Sale Order   │ (state: draft)
+   │ - customer   │
+   │ - lines[]    │
+   └──────┬───────┘
+          │
+          │ add_line(product, qty)
+          ▼
+   ┌──────────────┐
+   │ Order Line   │
+   │ - product    │
+   │ - quantity   │
+   │ - subtotal   │
+   └──────────────┘
+
+2. CONFIRM SALE ORDER
+   ┌──────────────┐
+   │ Sale Order   │
+   │ .confirm()   │
+   └──────┬───────┘
+          │
+          │ Creates Invoice
+          ▼
+   ┌──────────────┐
+   │   Invoice    │ (state: draft)
+   │ - customer   │
+   │ - lines[]    │
+   └──────┬───────┘
+          │
+          │ Copies lines from Sale Order
+          ▼
+   ┌──────────────┐
+   │ Invoice Line │
+   │ - product    │
+   │ - quantity   │
+   │ - subtotal   │
+   └──────┬───────┘
+          │
+          │ invoice.post()
+          ▼
+   ┌──────────────┐
+   │   Invoice    │ (state: posted)
+   └──────────────┘
+          │
+          │ Links back
+          ▼
+   ┌──────────────┐
+   │ Sale Order   │ (state: confirmed)
+   │ - invoice    │◄─── Invoice reference
+   └──────────────┘
+```
+
+### Customer Relationship Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              Customer Aggregation Flow                        │
+└─────────────────────────────────────────────────────────────┘
+
+Customer
+   │
+   ├─── sale_orders[] ────┐
+   │                      │
+   │                      ▼
+   │              ┌──────────────┐
+   │              │ Sale Order 1 │
+   │              │ total: 1000  │
+   │              └──────────────┘
+   │
+   │              ┌──────────────┐
+   │              │ Sale Order 2 │
+   │              │ total: 500   │
+   │              └──────────────┘
+   │
+   │                      │
+   │                      ▼
+   │              customer.total_spent()
+   │              = 1500
+   │
+   │
+   ├─── invoices[] ───────┐
+   │                      │
+   │                      ▼
+   │              ┌──────────────┐
+   │              │  Invoice 1    │
+   │              │ total: 1000   │
+   │              └──────────────┘
+   │
+   │              ┌──────────────┐
+   │              │  Invoice 2    │
+   │              │ total: 500    │
+   │              └──────────────┘
+   │
+   │                      │
+   │                      ▼
+   │              customer.total_invoiced()
+   │              = 1500
+   │
+   └─────────────────────────────────┘
+```
