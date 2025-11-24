@@ -3,7 +3,6 @@ from base import BaseModel, DATABASE
 from partner import Partner
 from product import Product
 
-
 class InvoiceLine:
     """
     Single line on an invoice:
