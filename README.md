@@ -36,10 +36,10 @@ python main.py
 The application will load data from `database.json` and present a menu-driven interface.
 
 ## Project Structure
-
+```
 mini-odoo-sales/
 ├── base.py # Base model class with ID generation and persistence
-\n
+
 ├── storage.py # JSON database read/write functions
 |
 ├── product.py # Product model with stock management
@@ -57,6 +57,7 @@ mini-odoo-sales/
 ├── database.json # JSON file acting as database
 |
 └── test.py # Test suite for all features
+```
 
 
 ## Data Model Overview
