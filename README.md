@@ -39,7 +39,7 @@ The application will load data from `database.json` and present a menu-driven in
 
 mini-odoo-sales/
 ├── base.py # Base model class with ID generation and persistence
-|
+\n
 ├── storage.py # JSON database read/write functions
 |
 ├── product.py # Product model with stock management
